@@ -15,9 +15,10 @@ STEP = 7
 
 
 def load_series(path: Path) -> pd.Series:
-    """Serie diaria sin huecos. Un día que falta se interpola en línea recta (hay uno solo en los datos)."""
+    """Serie diaria sin huecos. Un día que falta repite el valor del día anterior: interpolar usaría el día siguiente
+    y, si el hueco cae en un origen, el modelo vería el futuro (pasa con un día en los datos)."""
     s = pd.read_csv(path, parse_dates=["date"]).set_index("date")["usd_dop"]
-    return s.asfreq("D").interpolate(method="linear")
+    return s.asfreq("D").ffill()
 
 
 @dataclass(frozen=True)
@@ -60,8 +61,10 @@ def block_bootstrap_means(diff: np.ndarray, block: int, draws: int, rng: np.rand
 
 def summarize(folds: pd.DataFrame, baseline: str = "naive", seed: int = 7, draws: int = 2000) -> pd.DataFrame:
     """MAE, MAE relativo al baseline con intervalo bootstrap, y acierto de dirección."""
-    folds = folds.assign(abs_err=(folds.forecast - folds.actual).abs(),
-                         hit=np.sign(folds.forecast - folds["last"]) == np.sign(folds.actual - folds["last"]))
+    predicted = np.sign(folds.forecast - folds["last"])
+    # Un empate (el modelo predice "igual") no es ni acierto ni fallo de dirección: se excluye del porcentaje.
+    hit = (predicted == np.sign(folds.actual - folds["last"])).where(predicted != 0)
+    folds = folds.assign(abs_err=(folds.forecast - folds.actual).abs(), hit=hit)
     rng = np.random.default_rng(seed)
     out = []
     for (model, h), g in folds.groupby(["model", "horizon"]):
@@ -71,9 +74,10 @@ def summarize(folds: pd.DataFrame, baseline: str = "naive", seed: int = 7, draws
         boot = block_bootstrap_means(diff, block=max(1, -(-h // STEP)), draws=draws, rng=rng)
         out.append({
             "model": model, "horizon": h, "n": len(err), "mae": err.mean(),
-            "mae_vs_naive": err.mean() / base.mean() - 1 if model != baseline else 0.0,
+            "mae_vs_naive": (err.mean() / base.mean() - 1 if base.mean() > 0 else float("nan")) if model != baseline else 0.0,
             "diff_lo": np.percentile(boot, 2.5), "diff_hi": np.percentile(boot, 97.5),
             "direction": g.hit.mean() if model != baseline else float("nan"),  # el naive nunca predice un cambio
+            "direction_n": int(g.hit.notna().sum()) if model != baseline else 0,
         })
     return pd.DataFrame(out)
 

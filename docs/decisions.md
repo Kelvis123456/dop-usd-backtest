@@ -10,7 +10,9 @@ Cada entrada dice qué elegí, qué descarté y por qué.
 
 ## 2026-11-03 · Cómo se evita mirar el futuro
 
-El modelo recibe `values[: origen + 1]` y nada más. Lo comprobé de tres formas en los tests: un modelo espía que guarda lo que recibe y se compara con el prefijo de la serie; cambiar todo lo posterior al origen no cambia el pronóstico; y la prueba de que el test puede fallar. Metí a propósito `values[: origen + 2]` y fallaron 3 tests (el del espía, el de la tendencia lineal y el de dos modelos idénticos), así que sé que el arnés detecta una fuga de un solo día.
+El modelo recibe `values[: origen + 1]` y nada más. Lo comprobé de tres formas en los tests: un modelo espía que guarda lo que recibe y se compara con el prefijo de la serie; cambiar todo lo posterior al origen no cambia el pronóstico; y la prueba de que el test puede fallar. Metí a propósito `values[: origen + 2]` y ahora fallan 5 tests, así que sé que el arnés detecta una fuga de un solo día.
+
+La primera versión no era tan buena: el test de "cambiar el futuro" cortaba en el índice 400, que no es un origen (son 364, 371, ..., 399, 406), y por eso no detectaba esa fuga; los 3 fallos de entonces eran el espía y dos casos que caían por casualidad. Una revisión posterior lo encontró y lo corté en un origen real. También encontró una fuga que sí existía: el único día que falta en los datos es un origen, y interpolarlo en línea recta le mostraba al modelo el día siguiente. Ahora se repite el valor anterior.
 
 ## 2026-11-03 · No limpiar la serie
 
