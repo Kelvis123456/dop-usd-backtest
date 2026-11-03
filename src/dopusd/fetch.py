@@ -27,10 +27,13 @@ async def fetch_day(client: httpx.AsyncClient, day: date, sem: asyncio.Semaphore
                     if r.status_code == 404:
                         break  # esa fecha no existe en este espejo, se prueba el otro
                     r.raise_for_status()
-                    rate = r.json()["usd"]["dop"]
-                    return day, float(rate)
-                except (httpx.HTTPError, KeyError, ValueError):
-                    await asyncio.sleep(1 + attempt)
+                    rate = float(r.json()["usd"]["dop"])
+                    if not 1 < rate < 1000:  # un valor absurdo se trata como día faltante
+                        break
+                    return day, rate
+                except (httpx.HTTPError, KeyError, ValueError, TypeError):
+                    if attempt < 2:
+                        await asyncio.sleep(1 + attempt)
         return day, None
 
 
@@ -41,6 +44,9 @@ async def main(start: date, end: date, out: Path) -> None:
         results = await asyncio.gather(*(fetch_day(client, d, sem) for d in days))
     ok = [(d, r) for d, r in results if r is not None]
     missing = [d for d, r in results if r is None]
+    if len(missing) > 0.02 * len(days):
+        # Con la red caída no se pisa un dataset bueno con uno roto.
+        sys.exit(f"faltan {len(missing)} de {len(days)} días; no escribo {out}")
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w", newline="") as f:
         w = csv.writer(f)
