@@ -20,6 +20,8 @@ Ningún modelo le gana al último valor. Datos: 972 días (2024-03-06 a 2026-11-
 
 "Peor" significa que el intervalo de la diferencia queda entero por encima de cero. "Incluye 0" significa que con 83 orígenes no puedo distinguirlo del naive en ninguna dirección. El acierto de dirección (si el modelo adivina si sube o baja) no pasa de 57 % en ningún caso, y la mayoría queda por debajo de 50 %.
 
+![Error de cada modelo respecto al naive, con intervalo del 95 %](results/error_vs_naive.png)
+
 La tabla completa, con los intervalos, sale de `uv run python -m dopusd.backtest` y queda en `results/summary.csv`.
 
 ## Cómo está hecho
