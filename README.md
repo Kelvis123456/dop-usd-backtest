@@ -1,39 +1,41 @@
+Español: [README.es.md](README.es.md)
+
 # dop-usd-backtest
 
-Un backtest honesto de pronósticos de la tasa USD a DOP: cinco modelos contra el más simple de todos (repetir el último valor), con origen móvil y sin mirar el futuro.
+An honest backtest of USD to DOP exchange rate forecasts: five models against the simplest one of all (repeat the last value), with a rolling origin and no peeking at the future. DOP is the Dominican peso.
 
-Lo hice para practicar la parte de pronosticar que casi siempre se hace mal: medir. Es fácil ajustar un ARIMA y mostrar una curva bonita. Lo difícil es comprobar que le gana a no hacer nada.
+I built it to practice the part of forecasting that is almost always done badly: measuring. It is easy to fit an ARIMA and show a nice curve. The hard part is checking that it beats doing nothing.
 
 **Stack:** Python 3.13 · pandas · statsmodels · pytest · uv
 
-## Resultado
+## Result
 
-Ningún modelo le gana al último valor. Datos: 972 días (2024-03-06 a 2026-11-02), 83 orígenes (uno cada 7 días, con al menos un año de historial). La tabla es el error absoluto medio en pesos por dólar y cuánto más (+) o menos (-) error tiene cada modelo que el naive. El intervalo es del 95 % para esa diferencia, con bootstrap por bloques.
+No model beats the last value. Data: 972 days (2024-03-06 to 2026-11-02), 83 origins (one every 7 days, with at least a year of history). The table shows mean absolute error in pesos per dollar, and how much more (+) or less (-) error each model has than the naive one. The interval is 95% for that difference, using a block bootstrap.
 
-| Modelo | h=1 día | h=7 días | h=30 días |
+| Model | h=1 day | h=7 days | h=30 days |
 |---|---|---|---|
-| naive (último valor) | 0.177 | 0.468 | 1.101 |
-| drift (tendencia del último año) | -0.2 % (incluye 0) | +1.5 % (incluye 0) | **+7.0 %, peor** |
-| ETS con tendencia amortiguada | **+10.9 %, peor** | +2.2 % (incluye 0) | +5.6 % (incluye 0) |
-| ARIMA(1,1,1) | **+10.3 %, peor** | **+2.8 %, peor** (por poco) | +0.2 % (incluye 0) |
-| mediana de 5 días | **+57.8 %, peor** | **+11.4 %, peor** | +2.4 % (incluye 0) |
+| naive (last value) | 0.177 | 0.468 | 1.101 |
+| drift (trend of the last year) | -0.2 % (includes 0) | +1.5 % (includes 0) | **+7.0 %, worse** |
+| ETS with damped trend | **+10.9 %, worse** | +2.2 % (includes 0) | +5.6 % (includes 0) |
+| ARIMA(1,1,1) | **+10.3 %, worse** | **+2.8 %, worse** (barely) | +0.2 % (includes 0) |
+| 5-day median | **+57.8 %, worse** | **+11.4 %, worse** | +2.4 % (includes 0) |
 
-"Peor" significa que el intervalo de la diferencia queda entero por encima de cero. "Incluye 0" significa que con 83 orígenes no puedo distinguirlo del naive en ninguna dirección. El "peor" de ARIMA a 7 días es el más justo: su límite inferior es 0.0001 pesos. Probé 10 semillas del bootstrap y siempre quedó por encima de cero, pero por muy poco. Tampoco corrijo por haber hecho 12 comparaciones, lo que solo debilita los "peor".
+"Worse" means the interval of the difference sits entirely above zero. "Includes 0" means that with 83 origins I cannot tell it apart from the naive model in either direction. ARIMA's "worse" at 7 days is the fairest call: its lower bound is 0.0001 pesos. I tried 10 bootstrap seeds and it always stayed above zero, but only just. I also do not correct for having made 12 comparisons, which only weakens the "worse" calls.
 
-El acierto de dirección (si el modelo adivina si sube o baja) no pasa de 57 % en ningún caso y 9 de 12 quedan por debajo de 50 %. Cuando un modelo predice "igual que hoy" (le pasa a la mediana de 5 días en 9 de 83 orígenes) no cuento ese origen ni como acierto ni como fallo.
+Directional accuracy (whether the model guesses if the rate goes up or down) never gets past 57 % and 9 of 12 cases fall below 50 %. When a model predicts "same as today" (it happens to the 5-day median in 9 of 83 origins) I count that origin as neither a hit nor a miss.
 
-![Error de cada modelo respecto al naive, con intervalo del 95 %](results/error_vs_naive.png)
+![Each model's error relative to naive, with a 95% interval](results/error_vs_naive.png)
 
-La tabla completa, con los intervalos, sale de `uv run python -m dopusd.backtest` y queda en `results/summary.csv`.
+The full table, with the intervals, comes from `uv run python -m dopusd.backtest` and ends up in `results/summary.csv`.
 
-## Cómo está hecho
+## How it is built
 
-- `fetch.py` baja la tasa día por día a `data/usd_dop.csv`.
-- `backtest.py` recorre los orígenes. En cada uno le pasa al modelo solo `values[: origen + 1]` y compara con el valor `h` días después.
-- `models.py` tiene los cinco pronosticadores. Todos tienen la misma firma, así que agregar uno son diez líneas.
-- Los intervalos usan bootstrap por bloques circulares. Con un origen por semana y horizonte de 30 días, los orígenes vecinos comparten parte del recorrido; remuestrear uno por uno haría los intervalos más estrechos de lo que son.
+- `fetch.py` downloads the rate day by day into `data/usd_dop.csv`.
+- `backtest.py` walks through the origins. At each one it hands the model only `values[: origen + 1]` and compares with the value `h` days later.
+- `models.py` has the five forecasters. They all share the same signature, so adding one takes ten lines.
+- The intervals use a circular block bootstrap. With one origin per week and a 30-day horizon, neighboring origins share part of the path; resampling them one by one would make the intervals narrower than they really are.
 
-## Cómo correrlo
+## How to run it
 
 ```bash
 uv sync
@@ -41,14 +43,14 @@ uv run python -m dopusd.backtest      # usa data/usd_dop.csv, que ya está en el
 uv run pytest
 ```
 
-Para volver a bajar los datos: `uv run python -m dopusd.fetch` (tarda un minuto, unas mil peticiones).
+To download the data again: `uv run python -m dopusd.fetch` (takes a minute, about a thousand requests).
 
-## Lo que hay que saber antes de creerle
+## What to know before believing it
 
-- **Los datos no son la tasa oficial.** Vienen de `fawazahmed0/currency-api`, un agregado gratuito publicado en jsDelivr. No es la tasa del Banco Central ni la de ningún banco. Tiene ruido: el 2026-09-29 marca 57.72 cuando el día anterior y el siguiente rondan 59.5, un valor suelto que no se repite. La autocorrelación de los retornos diarios es de -0.23, más negativa de lo que esperaría de una moneda que se mueve poco, y creo que es en parte ese ruido. No limpié la serie: un filtro centrado miraría el futuro de cada origen.
-- **Es una serie, dos años y 83 orígenes.** Sirve para ver que ARIMA y ETS no aportan aquí. No dice nada de otras monedas ni de otros periodos.
-- **Un día falta** (2025-12-10) y repito el valor del día anterior. Antes lo interpolaba, y como ese día es justo un origen del backtest, el modelo veía el valor del día siguiente. Lo encontró una revisión; cambió el naive a 1 día de 0.1757 a 0.1767 y ninguna conclusión.
-- **No hay modelos con variables externas** (inflación, tasa de política monetaria, reservas). Un modelo así quizá le gane al naive, pero habría que conseguir esos datos con la misma fecha de publicación que tendría un usuario real, y no los conseguí.
-- **No es una recomendación de nada.**
+- **The data is not the official rate.** It comes from `fawazahmed0/currency-api`, a free aggregate published on jsDelivr. It is not the Central Bank's rate or any bank's. It is noisy: on 2026-09-29 it shows 57.72 when the previous and next days are around 59.5, an isolated value that does not repeat. The autocorrelation of daily returns is -0.23, more negative than I would expect from a currency that moves little, and I think it is partly that noise. I did not clean the series: a centered filter would look at each origin's future.
+- **It is one series, two years and 83 origins.** It is enough to see that ARIMA and ETS add nothing here. It says nothing about other currencies or other periods.
+- **One day is missing** (2025-12-10) and I repeat the previous day's value. I used to interpolate it, and since that day is exactly an origin of the backtest, the model saw the next day's value. A review found it; it changed the 1-day naive from 0.1757 to 0.1767 and no conclusion.
+- **There are no models with external variables** (inflation, policy rate, reserves). A model like that might beat naive, but I would need that data with the same publication date a real user would have, and I could not get it.
+- **It is not a recommendation of anything.**
 
-Las decisiones y lo que descarté están en [docs/decisions.md](docs/decisions.md).
+The decisions and what I discarded are in [docs/decisions.md](docs/decisions.md).
